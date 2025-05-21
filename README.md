@@ -12,7 +12,11 @@ This project provides a FastMCP server for interacting with the Cal.com API. It 
 ## Setup
 
 1.  **Clone the repository (if applicable) or download the files.**
-
+    ```bash
+    git clone https://github.com/Danielpeter-99/calcom-mcp.git
+    cd calcom-mcp
+    ```
+    
 2.  **Create a virtual environment (recommended):**
     ```bash
     python -m venv venv
