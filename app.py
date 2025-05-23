@@ -30,7 +30,11 @@ CALCOM_API_BASE_URL = "https://api.cal.com/v2"
 
 @mcp.tool()
 def get_api_status() -> str:
-    """Checks if the Cal.com API key is configured in the environment."""
+    """Check if the Cal.com API key is configured in the environment.
+
+    Returns:
+        A string indicating whether the Cal.com API key is configured or not.
+    """
     if CALCOM_API_KEY:
         return "Cal.com API key is configured."
     else:
@@ -38,28 +42,20 @@ def get_api_status() -> str:
 
 @mcp.tool()
 def list_event_types() -> dict:
-    """Fetches a list of all event types from Cal.com.
-    Requires the CALCOM_API_KEY environment variable to be set.
-    Returns a dictionary containing the API response or an error message.
+    """Fetch a list of all event types from Cal.com for the authenticated account.
+
+    Returns:
+        A dictionary containing the API response (list of event types) or an error message.
     """
     if not CALCOM_API_KEY:
         return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
-
     headers = {
-        "Authorization": f"Bearer {CALCOM_API_KEY}", # Assuming Bearer token based on some v1 docs, might need adjustment for v2 API key auth
+        "Authorization": f"Bearer {CALCOM_API_KEY}",
         "Content-Type": "application/json"
     }
-    # The Cal.com API docs suggest /event-types for v2, but let's try with apiKey query param first as it's a common pattern if Bearer doesn't work.
-    # Update: The v2 docs are a bit ambiguous on API key auth. Sticking with Bearer for now as per some examples.
-    # If direct API key usage is different (e.g. x-api-key header or specific query param), this needs to be updated.
-    # The endpoint for listing event types is assumed to be /event-types based on documentation.
-    # Example: curl -X GET https://api.cal.com/v2/event-types -H "Authorization: Bearer YOUR_API_KEY"
-    # For API key specific auth, it might be https://api.cal.com/v2/event-types?apiKey=YOUR_API_KEY
-    # Let's try the Bearer token approach first as it's more standard for API access.
-
     try:
         response = requests.get(f"{CALCOM_API_BASE_URL}/event-types", headers=headers)
-        response.raise_for_status()  # Raises an HTTPError for bad responses (4XX or 5XX)
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as http_err:
         return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
@@ -68,11 +64,9 @@ def list_event_types() -> dict:
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
 
-
 @mcp.tool()
 def get_bookings(event_type_id: int = None, user_id: int = None, status: str = None, date_from: str = None, date_to: str = None, limit: int = 20) -> dict:
-    """Fetches a list of bookings from Cal.com, with optional filters.
-    Requires the CALCOM_API_KEY environment variable to be set.
+    """Fetch a list of bookings from Cal.com, with optional filters.
 
     Args:
         event_type_id: Optional. Filter bookings by a specific event type ID.
@@ -87,12 +81,10 @@ def get_bookings(event_type_id: int = None, user_id: int = None, status: str = N
     """
     if not CALCOM_API_KEY:
         return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
-
     headers = {
         "Authorization": f"Bearer {CALCOM_API_KEY}",
         "Content-Type": "application/json"
     }
-
     params = {}
     if event_type_id is not None:
         params['eventTypeId'] = event_type_id
@@ -105,11 +97,10 @@ def get_bookings(event_type_id: int = None, user_id: int = None, status: str = N
     if date_to is not None:
         params['dateTo'] = date_to
     if limit is not None:
-        params['take'] = limit # Common Cal.com parameter for limit
-
+        params['take'] = limit
     try:
         response = requests.get(f"{CALCOM_API_BASE_URL}/bookings", headers=headers, params=params)
-        response.raise_for_status()  # Raises an HTTPError for bad responses (4XX or 5XX)
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as http_err:
         return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
@@ -117,7 +108,6 @@ def get_bookings(event_type_id: int = None, user_id: int = None, status: str = N
         return {"error": f"Request exception occurred: {req_err}"}
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
-
 
 @mcp.tool()
 def create_booking(
@@ -127,19 +117,18 @@ def create_booking(
     attendee_timezone: str,
     event_type_id: int = None,
     event_type_slug: str = None,
-    username: str = None, # Required with event_type_slug if event_type_id is not provided and it's a user event
-    team_slug: str = None, # Required with event_type_slug if event_type_id is not provided and it's a team event
-    organization_slug: str = None, # Optional, used with event_type_slug + username/team_slug
+    username: str = None,
+    team_slug: str = None,
+    organization_slug: str = None,
     attendee_phone_number: str = None,
     attendee_language: str = None,
     guests: list[str] = None,
-    location_input: str = None, # Can be a string (e.g., Cal Video, Google Meet) or a custom URL. API expects an object for some cases.
+    location_input: str = None,
     metadata: dict = None,
     length_in_minutes: int = None,
     booking_fields_responses: dict = None
 ) -> dict:
-    """Creates a new booking in Cal.com.
-    Requires the CALCOM_API_KEY environment variable to be set.
+    """Create a new booking in Cal.com for a specific event type and attendee.
 
     Args:
         start_time: Required. The start time of the booking in ISO 8601 format in UTC (e.g., '2024-08-13T09:00:00Z').
@@ -155,7 +144,6 @@ def create_booking(
         attendee_language: Optional. Preferred language for the attendee (e.g., 'en', 'it').
         guests: Optional. A list of additional guest email addresses.
         location_input: Optional. Specifies the meeting location. Can be a simple string for Cal Video, or a URL for custom locations.
-                       The API might expect a more structured object for specific integrations.
         metadata: Optional. A dictionary of custom key-value pairs (max 50 keys, 40 char key, 500 char value).
         length_in_minutes: Optional. If the event type allows variable lengths, specify the desired duration.
         booking_fields_responses: Optional. A dictionary for responses to custom booking fields (slug: value).
@@ -165,16 +153,13 @@ def create_booking(
     """
     if not CALCOM_API_KEY:
         return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
-
     if not event_type_id and not (event_type_slug and (username or team_slug)):
         return {"error": "Either 'event_type_id' or ('event_type_slug' and 'username'/'team_slug') must be provided."}
-
     headers = {
         "Authorization": f"Bearer {CALCOM_API_KEY}",
         "Content-Type": "application/json",
-        "cal-api-version": "2024-08-13"  # As per Cal.com v2 API docs for create booking
+        "cal-api-version": "2024-08-13"
     }
-
     payload = {
         "start": start_time,
         "attendee": {
@@ -183,7 +168,6 @@ def create_booking(
             "timeZone": attendee_timezone
         }
     }
-
     if event_type_id:
         payload['eventTypeId'] = event_type_id
     else:
@@ -194,15 +178,13 @@ def create_booking(
             payload['teamSlug'] = team_slug
         if organization_slug:
             payload['organizationSlug'] = organization_slug
-
     if attendee_phone_number:
         payload['attendee']['phoneNumber'] = attendee_phone_number
     if attendee_language:
         payload['attendee']['language'] = attendee_language
     if guests:
         payload['guests'] = guests
-    if location_input: # The API docs suggest 'location' can be an object. For simplicity, we'll pass a string if provided.
-                      # For more complex location types, this might need to be an object.
+    if location_input:
         payload['location'] = location_input
     if metadata:
         payload['metadata'] = metadata
@@ -210,18 +192,137 @@ def create_booking(
         payload['lengthInMinutes'] = length_in_minutes
     if booking_fields_responses:
         payload['bookingFieldsResponses'] = booking_fields_responses
-
     try:
         response = requests.post(f"{CALCOM_API_BASE_URL}/bookings", headers=headers, json=payload)
-        response.raise_for_status()  # Raises an HTTPError for bad responses (4XX or 5XX)
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as http_err:
         error_details = {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code}
         try:
-            error_details["response_text"] = response.json() # Try to parse JSON error response
+            error_details["response_text"] = response.json()
         except ValueError:
-            error_details["response_text"] = response.text # Fallback to raw text
+            error_details["response_text"] = response.text
         return error_details
+    except requests.exceptions.RequestException as req_err:
+        return {"error": f"Request exception occurred: {req_err}"}
+    except Exception as e:
+        return {"error": f"An unexpected error occurred: {e}"}
+
+@mcp.tool()
+def list_schedules(user_id: int = None, team_id: int = None, limit: int = 20) -> dict:
+    """List all schedules available to the authenticated user or for a specific user/team.
+
+    Args:
+        user_id: Optional. Filter schedules by user ID.
+        team_id: Optional. Filter schedules by team ID.
+        limit: Optional. Maximum number of schedules to return (default 20).
+
+    Returns:
+        A dictionary containing the API response (list of schedules) or an error message.
+    """
+    if not CALCOM_API_KEY:
+        return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
+    headers = {
+        "Authorization": f"Bearer {CALCOM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    params = {}
+    if user_id is not None:
+        params["userId"] = user_id
+    if team_id is not None:
+        params["teamId"] = team_id
+    if limit is not None:
+        params["take"] = limit
+    try:
+        response = requests.get(f"{CALCOM_API_BASE_URL}/schedules", headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
+    except requests.exceptions.RequestException as req_err:
+        return {"error": f"Request exception occurred: {req_err}"}
+    except Exception as e:
+        return {"error": f"An unexpected error occurred: {e}"}
+
+@mcp.tool()
+def list_teams(limit: int = 20) -> dict:
+    """List all teams available to the authenticated user.
+
+    Args:
+        limit: Optional. Maximum number of teams to return (default 20).
+
+    Returns:
+        A dictionary containing the API response (list of teams) or an error message.
+    """
+    if not CALCOM_API_KEY:
+        return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
+    headers = {
+        "Authorization": f"Bearer {CALCOM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    params = {"take": limit} if limit is not None else {}
+    try:
+        response = requests.get(f"{CALCOM_API_BASE_URL}/teams", headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
+    except requests.exceptions.RequestException as req_err:
+        return {"error": f"Request exception occurred: {req_err}"}
+    except Exception as e:
+        return {"error": f"An unexpected error occurred: {e}"}
+
+@mcp.tool()
+def list_users(limit: int = 20) -> dict:
+    """List all users available to the authenticated account.
+
+    Args:
+        limit: Optional. Maximum number of users to return (default 20).
+
+    Returns:
+        A dictionary containing the API response (list of users) or an error message.
+    """
+    if not CALCOM_API_KEY:
+        return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
+    headers = {
+        "Authorization": f"Bearer {CALCOM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    params = {"take": limit} if limit is not None else {}
+    try:
+        response = requests.get(f"{CALCOM_API_BASE_URL}/users", headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
+    except requests.exceptions.RequestException as req_err:
+        return {"error": f"Request exception occurred: {req_err}"}
+    except Exception as e:
+        return {"error": f"An unexpected error occurred: {e}"}
+
+@mcp.tool()
+def list_webhooks(limit: int = 20) -> dict:
+    """List all webhooks configured for the authenticated account.
+
+    Args:
+        limit: Optional. Maximum number of webhooks to return (default 20).
+
+    Returns:
+        A dictionary containing the API response (list of webhooks) or an error message.
+    """
+    if not CALCOM_API_KEY:
+        return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
+    headers = {
+        "Authorization": f"Bearer {CALCOM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    params = {"take": limit} if limit is not None else {}
+    try:
+        response = requests.get(f"{CALCOM_API_BASE_URL}/webhooks", headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
     except requests.exceptions.RequestException as req_err:
         return {"error": f"Request exception occurred: {req_err}"}
     except Exception as e:
