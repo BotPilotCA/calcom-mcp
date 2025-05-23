@@ -57,10 +57,23 @@ The server will start at localhost:8010, and you should see output indicating it
 
 The server currently provides the following tools for LLM interaction:
 
--   `get_api_status()`: Checks if the Cal.com API key is configured in the environment.
--   `list_event_types()`: Fetches a list of all event types from Cal.com.
--   `get_bookings(...)`: Fetches a list of bookings from Cal.com, with optional filters (event_type_id, user_id, status, date_from, date_to, limit).
--   `create_booking(...)`: Creates a new booking in Cal.com. Requires parameters like start_time, attendee details, and event type identifiers.
+-   `get_api_status()`: Check if the Cal.com API key is configured in the environment. Returns a string indicating the status.
+-   `list_event_types()`: Fetch a list of all event types from Cal.com for the authenticated account. Returns a dictionary with the list of event types or an error message.
+-   `get_bookings(...)`: Fetch a list of bookings from Cal.com, with optional filters (event_type_id, user_id, status, date_from, date_to, limit). Returns a dictionary with the list of bookings or an error message.
+-   `create_booking(...)`: Create a new booking in Cal.com for a specific event type and attendee. Requires parameters like start_time, attendee details, and event type identifiers. Returns a dictionary with booking details or an error message.
+-   `list_schedules(...)`: List all schedules available to the authenticated user or for a specific user/team. Optional filters: user_id, team_id, limit. Returns a dictionary with the list of schedules or an error message.
+-   `list_teams(...)`: List all teams available to the authenticated user. Optional filter: limit. Returns a dictionary with the list of teams or an error message.
+-   `list_users(...)`: List all users available to the authenticated account. Optional filter: limit. Returns a dictionary with the list of users or an error message.
+-   `list_webhooks(...)`: List all webhooks configured for the authenticated account. Optional filter: limit. Returns a dictionary with the list of webhooks or an error message.
+
+**Note:** All tools require the `CALCOM_API_KEY` environment variable to be set. If it is not set, tools will return a structured error message.
+
+## Tool Usage and Error Handling
+
+- All tools return either the API response (as a dictionary or string) or a structured error message with details about the failure.
+- Error messages include the type of error, HTTP status code (if applicable), and the response text from the Cal.com API.
+- For best results, always check for the presence of an `error` key in the response before using the returned data.
+- Tools are designed to be robust and provide informative feedback for both successful and failed API calls.
 
 ## Development Notes
 
@@ -68,6 +81,13 @@ The server currently provides the following tools for LLM interaction:
 -   Authentication is primarily handled using a Bearer token with the `CALCOM_API_KEY`.
 -   The `create_booking` tool uses the `cal-api-version: 2024-08-13` header as specified in the Cal.com API v2 documentation for that endpoint.
 -   Error handling is included in the API calls to provide informative responses.
+
+## 🚀 Built With
+
+[![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)](https://www.python.org/)  
+[![FastMCP](https://img.shields.io/badge/FastMCP-Framework-8A2BE2?logo=fastapi&logoColor=white)](https://github.com/jlowin/fastmcp)  
+[![Cal.com API](https://img.shields.io/badge/Cal.com%20API-v2-00B8A9?logo=google-calendar&logoColor=white)](https://cal.com/docs/api-reference/v2/introduction)  
+
 
 ## Important Security Note
 
