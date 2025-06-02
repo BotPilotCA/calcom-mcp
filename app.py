@@ -41,28 +41,106 @@ def get_api_status() -> str:
         return "Cal.com API key is NOT configured. Please set the CALCOM_API_KEY environment variable."
 
 @mcp.tool()
-def list_event_types() -> dict:
-    """Fetch a list of all event types from Cal.com for the authenticated account.
+def list_event_types() -> list[dict] | dict:
+    """Fetch a simplified list of active (non-hidden) event types from Cal.com.
+    This is preferred for LLMs to easily present options or make booking decisions.
 
     Returns:
-        A dictionary containing the API response (list of event types) or an error message.
+        A list of dictionaries, each with 'id', 'title', 'slug', 'length_minutes',
+        'owner_profile_slug' (user or team slug), and 'location_summary'.
+        Returns an error dictionary if the API call fails or no event types are found.
     """
     if not CALCOM_API_KEY:
         return {"error": "Cal.com API key not configured. Please set the CALCOM_API_KEY environment variable."}
+    
     headers = {
         "Authorization": f"Bearer {CALCOM_API_KEY}",
         "Content-Type": "application/json"
     }
+    
+    raw_response_data = {}
     try:
         response = requests.get(f"{CALCOM_API_BASE_URL}/event-types", headers=headers)
         response.raise_for_status()
-        return response.json()
+        raw_response_data = response.json()
     except requests.exceptions.HTTPError as http_err:
         return {"error": f"HTTP error occurred: {http_err}", "status_code": response.status_code, "response_text": response.text}
     except requests.exceptions.RequestException as req_err:
         return {"error": f"Request exception occurred: {req_err}"}
     except Exception as e:
-        return {"error": f"An unexpected error occurred: {e}"}
+        return {"error": f"An unexpected error occurred during API call or data processing: {e}"}
+
+    options = []
+    event_type_groups = raw_response_data.get("data", {}).get("eventTypeGroups", [])
+
+    if not event_type_groups and raw_response_data.get("data", {}).get("eventTypes"):
+        event_types_direct = raw_response_data.get("data", {}).get("eventTypes", [])
+        for et in event_types_direct:
+            if not et.get("hidden"):
+                owner_slug_info = f"user_id_{et.get('userId')}"
+                if et.get("teamId"):
+                    owner_slug_info = f"team_id_{et.get('teamId')}"
+
+                location_types = [
+                    loc.get("type", "unknown")
+                    .replace("integrations:google:meet", "Google Meet")
+                    .replace("integrations:zoom:zoom_video", "Zoom") # Common Zoom integration key
+                    .replace("integrations:microsoft:teams", "Microsoft Teams") # Common Teams key
+                    .replace("inPerson", "In-person")
+                    for loc in et.get("locations", [])
+                ]
+                location_summary = ", ".join(location_types) or "Provider configured"
+                # Check for Cal Video (often 'dailyCo', 'calvideo', or similar)
+                if any("daily" in loc_type.lower() or "calvideo" in loc_type.lower() for loc_type in location_types):
+                    location_summary = "Cal Video"
+
+                options.append({
+                    "id": et.get("id"),
+                    "title": et.get("title"),
+                    "slug": et.get("slug"),
+                    "length_minutes": et.get("length"),
+                    "owner_info": owner_slug_info,
+                    "location_summary": location_summary,
+                    "requires_confirmation": et.get("requiresConfirmation", False),
+                    "description_preview": (et.get("description") or "")[:100] + "..." if et.get("description") else "No description."
+                })
+
+    else:
+        for group in event_type_groups:
+            owner_profile_slug = group.get("profile", {}).get("slug", f"group_owner_id_{group.get('id')}") # Fallback if slug missing
+            for et in group.get("eventTypes", []):
+                if not et.get("hidden"):  # Only include non-hidden event types
+                    location_types = [
+                        loc.get("type", "unknown")
+                        .replace("integrations:google:meet", "Google Meet")
+                        .replace("integrations:zoom:zoom_video", "Zoom")
+                        .replace("integrations:microsoft:teams", "Microsoft Teams")
+                        .replace("inPerson", "In-person")
+                        for loc in et.get("locations", [])
+                    ]
+                    location_summary = ", ".join(location_types) or "Provider configured"
+                    if any("daily" in loc_type.lower() or "calvideo" in loc_type.lower() for loc_type in location_types):
+                        location_summary = "Cal Video"
+
+                    options.append({
+                        "id": et.get("id"),
+                        "title": et.get("title"),
+                        "slug": et.get("slug"),
+                        "length_minutes": et.get("length"),
+                        "owner_profile_slug": owner_profile_slug,
+                        "location_summary": location_summary,
+                        "requires_confirmation": et.get("requiresConfirmation", False),
+                        # Add a snippet of the description if available
+                        "description_preview": (et.get("description") or "")[:100] + "..." if et.get("description") else "No description."
+                    })
+
+    if not options:
+        # Check if there was an issue with the raw response structure itself if it wasn't an HTTP/Request error
+        if not raw_response_data or "data" not in raw_response_data:
+             return {"error": "Failed to parse event types from Cal.com API response.", "raw_response_preview": str(raw_response_data)[:200]}
+        return {"message": "No active (non-hidden) event types found for the configured API key."}
+    
+    return options
 
 @mcp.tool()
 def get_bookings(event_type_id: int = None, user_id: int = None, status: str = None, date_from: str = None, date_to: str = None, limit: int = 20) -> dict:
