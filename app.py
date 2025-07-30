@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import uvicorn
 from typing import Optional, Dict, Any, List
 from fastmcp import FastMCP
 
@@ -247,9 +248,16 @@ if __name__ == "__main__":
     logger.info(f"Cal.com API key configured: {'Yes' if CALCOM_API_KEY else 'No'}")
     
     # Configure for web deployment
-    mcp.run(
-        transport="http",
+    # Use the settings approach as mentioned in the FastMCP documentation
+    import uvicorn
+    
+    # Create the ASGI app directly
+    app = mcp.create_app(transport="http")
+    
+    # Run with uvicorn directly to ensure proper host/port binding
+    uvicorn.run(
+        app,
         host="0.0.0.0",
         port=port,
-        path="/mcp"
+        log_level="info"
     )
