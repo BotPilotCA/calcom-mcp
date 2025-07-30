@@ -20,7 +20,6 @@ load_dotenv()
 # Initialize the FastMCP server
 mcp = FastMCP(
     name="Cal.com MCP Server",
-    description="A FastMCP server to interact with the Cal.com API, enabling LLMs to manage bookings, event types, and more."
 )
 
 # Get Cal.com API key from environment variable
